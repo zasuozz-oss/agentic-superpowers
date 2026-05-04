@@ -1,7 +1,6 @@
 ---
 name: karpathy-guidelines
-description: Karpathy's anti-overengineering rules for LLM coding. Use BEFORE writing, editing, refactoring, or fixing any code - enforces: state assumptions before implementing, ask when ambiguous, write minimum code (no speculative features/abstractions/error handling), make surgical changes (no drive-by refactors, match existing style, don't touch adjacent code), and define verifiable success criteria with tests. Trigger on requests like "add feature", "fix bug", "refactor", "implement", "edit this", "improve", or any code change task to prevent overcomplication, scope creep, silent assumptions, and unverifiable work.
-license: MIT
+description: Use before writing, editing, refactoring, or fixing any code — prevents overengineering, scope creep, silent assumptions, and unverifiable work. Also use when noticing overcomplicated output, unnecessary abstractions, or drive-by refactors.
 ---
 
 # Karpathy Guidelines

@@ -1,10 +1,4 @@
 <!-- AG-SUPERPOWERS:BEGIN -->
-# LANGUAGE CONVENTION
-- **Code & technical**: English — variables, functions, classes, comments, logs, error messages, workflow files, identifiers.
-- **Docs & content**: Vietnamese — documentation, explanations, user guides, business-facing content.
-- **Responses**: Vietnamese — explanations, plans, artifacts, and all direct replies to the user.
-- **User override**: Follow the user's requested language if explicitly stated.
-
 # Mandatory Skills Bootstrap
 Before doing ANYTHING else (including answering questions, asking clarifications,
 or reading any files), you MUST execute these view_file calls:
@@ -18,7 +12,7 @@ ALL subsequent skill invocations will be missed.
 **This is non-negotiable. Do it NOW before reading further.**
 
 # Coding Discipline (Karpathy Guidelines)
-Invoke the `karpathy-guidelines` skill for full reference. Core principles:
+Invoke the `view_file("~/.gemini/antigravity/skills/karpathy-guidelines")` skill for full reference. Core principles:
 1. **Think first** — state assumptions, surface tradeoffs, ask if unclear.
 2. **Simplicity** — minimum code, no speculative features/abstractions.
 3. **Surgical changes** — touch only what's needed, match existing style, clean only your own orphans.
