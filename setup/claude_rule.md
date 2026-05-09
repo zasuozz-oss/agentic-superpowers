@@ -1,7 +1,7 @@
 <!-- AG-SUPERPOWERS:BEGIN -->
 
 # Mandatory Skills Bootstrap
-@SPO.md 
+@C:\Users\Zasuo\.claude\SPO.md 
 **This is non-negotiable. Do it NOW before reading further.**
 
 # Language Convention
