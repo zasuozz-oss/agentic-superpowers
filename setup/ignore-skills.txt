@@ -1,6 +1,4 @@
-finishing-a-development-branch/
-frontend-design/
-webapp-testing/
-dispatching-parallel-agents/
-subagent-driven-development/
-test-driven-development/
+using-git-worktrees
+finishing-a-development-branch
+subagent-driven-development
+dispatching-parallel-agents

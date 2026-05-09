@@ -10,13 +10,6 @@ These files contain the skill activation protocol. If you skip this step,
 ALL subsequent skill invocations will be missed.
 
 **This is non-negotiable. Do it NOW before reading further.**
-
-# Coding Discipline (Karpathy Guidelines)
-Invoke the `view_file("~/.gemini/antigravity/skills/karpathy-guidelines")` skill for full reference. Core principles:
-1. **Think first** — state assumptions, surface tradeoffs, ask if unclear.
-2. **Simplicity** — minimum code, no speculative features/abstractions.
-3. **Surgical changes** — touch only what's needed, match existing style, clean only your own orphans.
-4. **Goal-driven** — define success criteria, verify each step.
 # Language Convention
 
 | Context | Language | Scope |

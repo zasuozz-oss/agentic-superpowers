@@ -60,7 +60,9 @@ DIFF_FILE="/tmp/superpowers-diff-$(date +%Y%m%d-%H%M%S).txt"
 
 # Build diff exclude arguments dynamically from ignore-skills.txt
 DIFF_OPTS=""
-while read -r line; do
+while read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     # Skip empty lines
     if [ -n "$line" ]; then
         # Remove trailing slash for diff -x
@@ -69,9 +71,9 @@ while read -r line; do
     fi
 done < "$SCRIPT_REAL_PATH/ignore-skills.txt"
 
-# Also exclude custom local skills (skills in GLOBAL but not in UPSTREAM)
-if [ -d "$UPSTREAM_DIR/skills/" ]; then
-    for local_skill in "$GLOBAL_SKILLS_DIR"/*; do
+# Also exclude custom local skills in the repo not in UPSTREAM
+if [ -d "$UPSTREAM_DIR/skills/" ] && [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
+    for local_skill in "$FORK_REPO_DIR/skills"/*; do
         skill_name=$(basename "$local_skill")
         if [ ! -e "$UPSTREAM_DIR/skills/$skill_name" ]; then
             DIFF_OPTS="$DIFF_OPTS -x '$skill_name'"
@@ -79,66 +81,87 @@ if [ -d "$UPSTREAM_DIR/skills/" ]; then
     done
 fi
 
-# Run diff using the dynamically built arguments
-eval "diff -r $DIFF_OPTS \"$GLOBAL_SKILLS_DIR/\" \"$UPSTREAM_DIR/skills/\" > \"$DIFF_FILE\" 2>&1 || true"
+TARGET_DIFF_DIR="$FORK_REPO_DIR/skills/"
+if [ -z "$FORK_REPO_DIR" ]; then TARGET_DIFF_DIR="$GLOBAL_SKILLS_DIR/"; fi
 
+# Run diff using the dynamically built arguments
+eval "diff -r $DIFF_OPTS \"$TARGET_DIFF_DIR\" \"$UPSTREAM_DIR/skills/\" > \"$DIFF_FILE\" 2>&1 || true"
 
 if [ -s "$DIFF_FILE" ]; then
     CHANGED=$(grep -cE "^(Only in|diff)" "$DIFF_FILE" 2>/dev/null || echo "0")
     echo "   ✓ $CHANGED changes found"
     echo ""
 else
-    echo "   ✓ Already up to date!"
+    echo "   ✓ Already up to date! Proceeding to sync anyway..."
     rm -f "$DIFF_FILE"
-    exit 0
 fi
 
 # Step 3: Automatically apply updates
-echo "📝 Step 3: Applying updates automatically..."
+echo "📝 Step 3: Syncing updates to local repository..."
 
-        # Update installed skills
-        echo ""
-        echo "📚 Updating installed skills..."
-        if command -v rsync >/dev/null 2>&1; then
-            rsync -av --exclude-from="$SCRIPT_REAL_PATH/ignore-skills.txt" "$UPSTREAM_DIR/skills/" "$GLOBAL_SKILLS_DIR/"
-        else
-            mkdir -p "$GLOBAL_SKILLS_DIR"
-            for skill_path in "$UPSTREAM_DIR/skills"/*; do
-                [ -e "$skill_path" ] || continue
-                skill_name=$(basename "$skill_path")
-                if ! grep -qE "^${skill_name}/?(\r)?$" "$SCRIPT_REAL_PATH/ignore-skills.txt" 2>/dev/null; then
-                    cp -R "$skill_path" "$GLOBAL_SKILLS_DIR/"
-                fi
-            done
-        fi
-        SKILL_COUNT=$(ls -1 "$GLOBAL_SKILLS_DIR/" | wc -l | tr -d ' ')
-        echo "   ✓ Updated $SKILL_COUNT skills at $GLOBAL_SKILLS_DIR/"
-        echo ""
-
-        # Sync back to fork repo
-        if [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
-            echo "🔄 Syncing to fork repo..."
-            if command -v rsync >/dev/null 2>&1; then
-                rsync -av --exclude '.git/' "$GLOBAL_SKILLS_DIR/" "$FORK_REPO_DIR/skills/"
-            else
-                mkdir -p "$FORK_REPO_DIR/skills"
-                for skill_path in "$GLOBAL_SKILLS_DIR"/*; do
-                    [ -e "$skill_path" ] || continue
-                    skill_name=$(basename "$skill_path")
-                    if [ "$skill_name" != ".git" ]; then
-                        cp -R "$skill_path" "$FORK_REPO_DIR/skills/"
-                    fi
-                done
+if [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
+    echo "🔄 Syncing upstream skills into $FORK_REPO_DIR/skills..."
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -av --exclude-from="$SCRIPT_REAL_PATH/ignore-skills.txt" "$UPSTREAM_DIR/skills/" "$FORK_REPO_DIR/skills/"
+    else
+        mkdir -p "$FORK_REPO_DIR/skills"
+        for skill_path in "$UPSTREAM_DIR/skills"/*; do
+            [ -e "$skill_path" ] || continue
+            skill_name=$(basename "$skill_path")
+            if ! grep -qE "^${skill_name}/?(\r)?$" "$SCRIPT_REAL_PATH/ignore-skills.txt" 2>/dev/null; then
+                cp -R "$skill_path" "$FORK_REPO_DIR/skills/"
             fi
-            echo "   ✓ Synced to $FORK_REPO_DIR/skills/"
-            echo ""
-            echo "   📌 Remember to commit changes in the fork repo:"
-            echo "   cd $FORK_REPO_DIR"
-            echo "   git add -A && git commit -m 'chore: update skills from upstream'"
-        else
-            echo "⚠️  Fork repo not found. Only installed skills were updated."
-            echo "   To sync manually, copy skills to your fork's skills/"
-        fi
+        done
+    fi
+    SKILL_COUNT=$(ls -1 "$FORK_REPO_DIR/skills/" | wc -l | tr -d ' ')
+    echo "   ✓ Synced $SKILL_COUNT skills to $FORK_REPO_DIR/skills/"
+    echo ""
+    
+    # Replace SPO.md with upstream CLAUDE.md
+    if [ -f "$UPSTREAM_DIR/CLAUDE.md" ]; then
+        echo "📄 Replacing SPO.md with upstream CLAUDE.md..."
+        cp -f "$UPSTREAM_DIR/CLAUDE.md" "$SCRIPT_REAL_PATH/SPO.md"
+        echo "   ✓ Replaced SPO.md"
+        echo ""
+    fi
+    echo "   📌 Remember to commit changes in the repo:"
+    echo "   cd $FORK_REPO_DIR"
+    echo "   git add -A && git commit -m 'chore: update skills from upstream'"
+else
+    echo "❌ Local repository directory not found! Skip syncing."
+fi
+
+# Apply stubs for ignored skills
+echo "🛡️  Applying stubs for ignored skills in local repository..."
+if [ -f "$SCRIPT_REAL_PATH/ignore-skills.txt" ] && [ -n "$FORK_REPO_DIR" ]; then
+    while read -r line || [ -n "$line" ]; do
+        line="${line%$'\r'}"
+        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        skill_name="${line%/}"
+        
+        stub_content=$(cat <<EOF
+---
+name: $skill_name
+description: This skill has been disabled by the configuration in ignore-skills.txt.
+---
+**SKILL DISABLED**
+
+This skill has been removed according to the user's hidden configuration.
+If you are instructed by another skill to use this functionality, please ignore that reference completely.
+You do not need to report an error; continue performing your task based on existing tools and skills.
+EOF
+)
+        for tgt_dir in "$FORK_REPO_DIR/skills"; do
+            if [ -d "$tgt_dir" ]; then
+                rm -rf "$tgt_dir/$skill_name"
+                mkdir -p "$tgt_dir/$skill_name"
+                echo "$stub_content" > "$tgt_dir/$skill_name/SKILL.md"
+            fi
+        done
+        echo "   ✓ Stubbed: $skill_name"
+    done < "$SCRIPT_REAL_PATH/ignore-skills.txt"
+fi
 
 # Summary
 echo ""
@@ -147,10 +170,9 @@ echo "║     Update Complete                                       ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "📊 Summary:"
-echo "   - Installed skills: ✓ Updated ($SKILL_COUNT)"
 if [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
-echo "   - Fork repo: ✓ Synced"
+echo "   - Local repo: ✓ Synced ($SKILL_COUNT skills)"
 fi
-echo "   - Custom rules: ✓ Untouched"
+echo "   - Run 'bash setup-global.sh' to install this new version to your system."
 echo ""
 echo "✅ Done!"

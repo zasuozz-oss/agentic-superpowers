@@ -64,6 +64,18 @@ echo "║     Install skills & rules globally                        ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
+read -p "Do you want to run update-superpowers.sh first to fetch the latest upstream skills? (y/n): " run_update
+if [ "$run_update" = "y" ] || [ "$run_update" = "yes" ]; then
+    echo "🔄 Running update-superpowers.sh..."
+    if [ -f "$SCRIPT_DIR/update-superpowers.sh" ]; then
+        bash "$SCRIPT_DIR/update-superpowers.sh"
+    else
+        echo "⚠️  update-superpowers.sh not found. Skipping update."
+    fi
+    echo "✅ Update step finished. Proceeding with setup..."
+    echo ""
+fi
+
 # Check if source directories exist
 if [ ! -d "$SCRIPT_DIR/../skills" ]; then
     echo "❌ Error: skills/ not found"
@@ -72,7 +84,7 @@ if [ ! -d "$SCRIPT_DIR/../skills" ]; then
 fi
 
 # Step 1: Create directories & check permissions
-echo "📁 Step 1/7: Creating config directories..."
+echo "📁 Step 1/8: Creating config directories..."
 mkdir -p "$GLOBAL_DIR" "$CODEX_DIR" "$(dirname "$GEMINI_MD")" "$(dirname "$CLAUDE_MD")"
 
 PERM_ERRORS=""
@@ -94,7 +106,7 @@ echo "   ✓ All directories ready"
 echo ""
 
 # Step 2: Check for duplicate skill names
-echo "🔍 Step 2/7: Checking for duplicate skills..."
+echo "🔍 Step 2/8: Checking for duplicate skills..."
 DUPLICATES=$(grep -rh '^name:' "$SCRIPT_DIR/../skills/"*/SKILL.md 2>/dev/null | sed 's/^name:[[:space:]]*//' | sort | uniq -d)
 if [ -n "$DUPLICATES" ]; then
     echo "   ❌ Duplicate skill names found:"
@@ -111,17 +123,14 @@ echo "   ✓ $SKILL_SRC_COUNT skills checked, no duplicates"
 echo ""
 
 # Step 3: Install skills
-echo "📚 Step 3/7: Installing skills..."
+echo "📚 Step 3/8: Installing skills..."
 if command -v rsync >/dev/null 2>&1; then
-    rsync -av --exclude-from="$SCRIPT_DIR/ignore-skills.txt" "$SCRIPT_DIR/../skills/" "$GLOBAL_DIR/skills/"
+    rsync -av "$SCRIPT_DIR/../skills/" "$GLOBAL_DIR/skills/"
 else
     mkdir -p "$GLOBAL_DIR/skills"
     for skill_path in "$SCRIPT_DIR/../skills"/*; do
         [ -e "$skill_path" ] || continue
-        skill_name=$(basename "$skill_path")
-        if ! grep -qE "^${skill_name}/?(\r)?$" "$SCRIPT_DIR/ignore-skills.txt" 2>/dev/null; then
-            cp -R "$skill_path" "$GLOBAL_DIR/skills/"
-        fi
+        cp -R "$skill_path" "$GLOBAL_DIR/skills/"
     done
 fi
 
@@ -131,23 +140,66 @@ echo "   ✓ $SKILL_COUNT skills installed to $GLOBAL_DIR/skills"
 # Mirror skills into ~/.codex/skills/ so Codex can read them via its own path
 mkdir -p "$CODEX_DIR/skills"
 if command -v rsync >/dev/null 2>&1; then
-    rsync -a --exclude-from="$SCRIPT_DIR/ignore-skills.txt" "$SCRIPT_DIR/../skills/" "$CODEX_DIR/skills/"
+    rsync -a "$SCRIPT_DIR/../skills/" "$CODEX_DIR/skills/"
 else
     for skill_path in "$SCRIPT_DIR/../skills"/*; do
         [ -e "$skill_path" ] || continue
-        skill_name=$(basename "$skill_path")
-        if ! grep -qE "^${skill_name}/?(\r)?$" "$SCRIPT_DIR/ignore-skills.txt" 2>/dev/null; then
-            cp -R "$skill_path" "$CODEX_DIR/skills/"
-        fi
+        cp -R "$skill_path" "$CODEX_DIR/skills/"
     done
 fi
 CODEX_SKILL_COUNT=$(ls -1 "$CODEX_DIR/skills" | wc -l | tr -d ' ')
 echo "   ✓ $CODEX_SKILL_COUNT skills mirrored to $CODEX_DIR/skills"
 
+# Mirror skills into ~/.claude/skills/ so Claude can read them via its own path
+CLAUDE_DIR="$HOME/.claude"
+mkdir -p "$CLAUDE_DIR/skills"
+if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$SCRIPT_DIR/../skills/" "$CLAUDE_DIR/skills/"
+else
+    for skill_path in "$SCRIPT_DIR/../skills"/*; do
+        [ -e "$skill_path" ] || continue
+        cp -R "$skill_path" "$CLAUDE_DIR/skills/"
+    done
+fi
+CLAUDE_SKILL_COUNT=$(ls -1 "$CLAUDE_DIR/skills" | wc -l | tr -d ' ')
+echo "   ✓ $CLAUDE_SKILL_COUNT skills mirrored to $CLAUDE_DIR/skills"
+
+# Apply stubs for ignored skills
+echo "🛡️  Applying stubs for ignored skills..."
+if [ -f "$SCRIPT_DIR/ignore-skills.txt" ]; then
+    while read -r line || [ -n "$line" ]; do
+        line="${line%$'\r'}"
+        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        skill_name="${line%/}"
+        
+        stub_content=$(cat <<EOF
+---
+name: $skill_name
+description: This skill has been disabled by the configuration in ignore-skills.txt.
+---
+**SKILL DISABLED**
+
+This skill has been removed according to the user's hidden configuration.
+If you are instructed by another skill to use this functionality, please ignore that reference completely.
+You do not need to report an error; continue performing your task based on existing tools and skills.
+EOF
+)
+        for tgt_dir in "$GLOBAL_DIR/skills" "$CODEX_DIR/skills" "$CLAUDE_DIR/skills" "$SCRIPT_DIR/../skills"; do
+            if [ -d "$tgt_dir" ]; then
+                rm -rf "$tgt_dir/$skill_name"
+                mkdir -p "$tgt_dir/$skill_name"
+                echo "$stub_content" > "$tgt_dir/$skill_name/SKILL.md"
+            fi
+        done
+        echo "   ✓ Stubbed: $skill_name"
+    done < "$SCRIPT_DIR/ignore-skills.txt"
+fi
+
 echo ""
 
 # Step 4: Install scripts
-echo "⚙️  Step 4/7: Installing setup scripts..."
+echo "⚙️  Step 4/8: Installing setup scripts..."
 if command -v rsync >/dev/null 2>&1; then
     rsync -av --delete "$SCRIPT_DIR/" "$GLOBAL_DIR/setup/" --exclude="setup-global.sh" --exclude="setup-global.ps1" --exclude="ignore-skills.txt"
 else
@@ -166,18 +218,35 @@ echo "   ✓ $SCRIPT_COUNT setup scripts installed"
 echo ""
 
 # Step 5: Update GEMINI.md (Antigravity)
-echo "📝 Step 5/7: Updating Antigravity rules (~/.gemini/GEMINI.md)..."
+echo "📝 Step 5/8: Updating Antigravity rules (~/.gemini/GEMINI.md)..."
 upsert_block "$GEMINI_MD" "$SCRIPT_DIR/gemini_rule.md"
 echo ""
 
 # Step 6: Update CLAUDE.md (Claude Desktop)
-echo "📝 Step 6/7: Updating Claude Desktop rules (~/.claude/CLAUDE.md)..."
+echo "📝 Step 6/8: Updating Claude Desktop rules (~/.claude/CLAUDE.md)..."
 upsert_block "$CLAUDE_MD" "$SCRIPT_DIR/claude_rule.md"
 echo ""
 
 # Step 7: Update AGENTS.md (Codex)
-echo "📝 Step 7/7: Updating Codex rules (~/.codex/AGENTS.md)..."
+echo "📝 Step 7/8: Updating Codex rules (~/.codex/AGENTS.md)..."
 upsert_block "$CODEX_MD" "$SCRIPT_DIR/codex_rule.md"
+echo ""
+
+# Step 8: Copy SPO.md to platform directories
+echo "📄 Step 8/8: Copying SPO.md to platform directories..."
+if [ -f "$SCRIPT_DIR/SPO.md" ]; then
+    cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.gemini/SPO.md"
+    cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.claude/SPO.md"
+    cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.codex/SPO.md"
+    echo "   ✓ Copied SPO.md to ~/.gemini, ~/.claude, and ~/.codex"
+elif [ -f "$SCRIPT_DIR/Spo.md" ]; then
+    cp -f "$SCRIPT_DIR/Spo.md" "$HOME/.gemini/SPO.md"
+    cp -f "$SCRIPT_DIR/Spo.md" "$HOME/.claude/SPO.md"
+    cp -f "$SCRIPT_DIR/Spo.md" "$HOME/.codex/SPO.md"
+    echo "   ✓ Copied Spo.md to ~/.gemini, ~/.claude, and ~/.codex as SPO.md"
+else
+    echo "   ⚠️  SPO.md not found in $SCRIPT_DIR!"
+fi
 echo ""
 
 # Cleanup old legacy directories if present
