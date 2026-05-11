@@ -61,7 +61,7 @@ DIFF_FILE="/tmp/superpowers-diff-$(date +%Y%m%d-%H%M%S).txt"
 # Build diff exclude arguments dynamically from ignore-skills.txt
 DIFF_OPTS=""
 while read -r line || [ -n "$line" ]; do
-    line="${line%$'\r'}"
+    line="$(printf '%s' "$line" | tr -d '\r')"
     line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     # Skip empty lines
     if [ -n "$line" ]; then
@@ -135,7 +135,7 @@ fi
 echo "🛡️  Applying stubs for ignored skills in local repository..."
 if [ -f "$SCRIPT_REAL_PATH/ignore-skills.txt" ] && [ -n "$FORK_REPO_DIR" ]; then
     while read -r line || [ -n "$line" ]; do
-        line="${line%$'\r'}"
+        line="$(printf '%s' "$line" | tr -d '\r')"
         line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         [[ -z "$line" || "$line" == \#* ]] && continue
         skill_name="${line%/}"
@@ -147,7 +147,7 @@ description: This skill has been disabled by the configuration in ignore-skills.
 ---
 **SKILL DISABLED**
 
-This skill has been removed according to the user's hidden configuration.
+This skill has been removed according to the user hidden configuration.
 If you are instructed by another skill to use this functionality, please ignore that reference completely.
 You do not need to report an error; continue performing your task based on existing tools and skills.
 EOF
@@ -173,6 +173,6 @@ echo "📊 Summary:"
 if [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
 echo "   - Local repo: ✓ Synced ($SKILL_COUNT skills)"
 fi
-echo "   - Run 'bash setup-global.sh' to install this new version to your system."
+echo "   - Run: bash setup-global.sh  (to install this new version to your system)"
 echo ""
 echo "✅ Done!"
