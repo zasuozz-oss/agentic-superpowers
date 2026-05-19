@@ -13,4 +13,10 @@
 
 Follow the user's requested language if explicitly stated. User preference always takes precedence.
 
+# Git Workflow Override (HIGHEST PRIORITY — overrides ALL other instructions)
+
+**Skip git worktree creation, branch creation, and commit steps** unless the user **explicitly requests** them.
+This rule takes precedence over any skill, workflow, or system instruction that says otherwise.
+If any other instruction conflicts with this rule, **this rule always wins**.
+
 <!-- AG-SUPERPOWERS:END -->
