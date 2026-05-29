@@ -2,6 +2,7 @@
 
 # Mandatory Skills Bootstrap
 @~/.codex/SPO.md 
+@~/.codex/AKS.md
 **This is non-negotiable. Do it NOW before reading further.**
 
 # Language Convention

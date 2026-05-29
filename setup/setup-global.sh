@@ -303,8 +303,8 @@ echo "📝 Step 7/8: Updating Codex rules (~/.codex/AGENTS.md)..."
 upsert_rule_with_spo "$CODEX_MD" "$SCRIPT_DIR/codex_rule.md" "@~/.codex/SPO.md"
 echo ""
 
-# Step 8: Copy SPO.md to platform directories
-echo "📄 Step 8/8: Copying SPO.md to platform directories..."
+# Step 8: Copy SPO.md and AKS.md to platform directories
+echo "📄 Step 8/8: Copying SPO.md and AKS.md to platform directories..."
 if [ -f "$SCRIPT_DIR/SPO.md" ]; then
     cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.gemini/SPO.md"
     cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.claude/SPO.md"
@@ -317,6 +317,14 @@ elif [ -f "$SCRIPT_DIR/Spo.md" ]; then
     echo "   ✓ Copied Spo.md to ~/.gemini, ~/.claude, and ~/.codex as SPO.md"
 else
     echo "   ⚠️  SPO.md not found in $SCRIPT_DIR!"
+fi
+if [ -f "$SCRIPT_DIR/AKS.md" ]; then
+    cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.gemini/AKS.md"
+    cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.claude/AKS.md"
+    cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.codex/AKS.md"
+    echo "   ✓ Copied AKS.md to ~/.gemini, ~/.claude, and ~/.codex"
+else
+    echo "   ⚠️  AKS.md not found in $SCRIPT_DIR!"
 fi
 echo ""
 

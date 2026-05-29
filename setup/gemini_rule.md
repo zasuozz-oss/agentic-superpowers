@@ -5,6 +5,7 @@ or reading any files), you MUST execute these view_file calls:
 
 1. `view_file("~/.gemini/antigravity/skills/using-superpowers/SKILL.md")`
 2. `view_file("~/.gemini/antigravity/skills/using-superpowers/references/gemini-tools.md")`
+3. `view_file("~/.gemini/AKS.md")`
 
 These files contain the skill activation protocol. If you skip this step,
 ALL subsequent skill invocations will be missed.

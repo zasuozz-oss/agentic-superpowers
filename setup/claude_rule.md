@@ -2,6 +2,7 @@
 
 # Mandatory Skills Bootstrap
 @~/.claude/SPO.md 
+@~/.claude/AKS.md
 **This is non-negotiable. Do it NOW before reading further.**
 
 # Language Convention
