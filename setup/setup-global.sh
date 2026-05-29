@@ -77,49 +77,7 @@ with open(sys.argv[1], 'w') as f:
     fi
 }
 
-# ─── upsert_rule_with_spo: merge rule file with SPO.md and upsert ───
-# Usage: upsert_rule_with_spo <target_file> <rule_source_file> <placeholder>
-upsert_rule_with_spo() {
-    local target_file="$1"
-    local rule_file="$2"
-    local placeholder="$3"
 
-    [ -f "$rule_file" ] || return 1
-
-    local spo_file="$SCRIPT_DIR/SPO.md"
-    [ -f "$spo_file" ] || spo_file="$SCRIPT_DIR/Spo.md"
-
-    mkdir -p "$(dirname "$target_file")"
-
-    local merged_content=""
-    if [ -f "$spo_file" ]; then
-        if [ -n "$PYTHON_CMD" ]; then
-            merged_content=$($PYTHON_CMD -c "
-import sys
-with open(sys.argv[1], 'r') as f:
-    rule = f.read()
-with open(sys.argv[2], 'r') as f:
-    spo = f.read()
-placeholder = sys.argv[3]
-modified = rule.replace(placeholder + ' ', spo).replace(placeholder, spo)
-sys.stdout.write(modified)
-" "$rule_file" "$spo_file" "$placeholder")
-        else
-            echo "   ⚠️  Python not found. Using raw rule file content."
-            merged_content=$(cat "$rule_file")
-        fi
-    else
-        echo "   ⚠️  SPO.md not found. Using raw rule file content."
-        merged_content=$(cat "$rule_file")
-    fi
-
-    # Write the merged content to a temporary file, then use upsert_block
-    local temp_file
-    temp_file=$(mktemp)
-    echo "$merged_content" > "$temp_file"
-    upsert_block "$target_file" "$temp_file"
-    rm -f "$temp_file"
-}
 
 
 echo "╔════════════════════════════════════════════════════════════╗"
@@ -295,12 +253,12 @@ echo ""
 
 # Step 6: Update CLAUDE.md (Claude Code)
 echo "📝 Step 6/8: Updating Claude Code rules (~/.claude/CLAUDE.md)..."
-upsert_rule_with_spo "$CLAUDE_MD" "$SCRIPT_DIR/claude_rule.md" "@~/.claude/SPO.md"
+upsert_block "$CLAUDE_MD" "$SCRIPT_DIR/claude_rule.md"
 echo ""
 
 # Step 7: Update AGENTS.md (Codex)
 echo "📝 Step 7/8: Updating Codex rules (~/.codex/AGENTS.md)..."
-upsert_rule_with_spo "$CODEX_MD" "$SCRIPT_DIR/codex_rule.md" "@~/.codex/SPO.md"
+upsert_block "$CODEX_MD" "$SCRIPT_DIR/codex_rule.md"
 echo ""
 
 # Step 8: Copy SPO.md and AKS.md to platform directories
