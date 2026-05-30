@@ -1,14 +1,14 @@
-# Antigravity Superpowers
+# Agentic Superpowers
 
-Customized [Superpowers](https://github.com/obra/superpowers) framework for Google Antigravity with global configuration.
+Cross-platform agent skills & rules framework for **Claude Code**, **Codex**, and **Antigravity (Gemini)** — one setup installs global config and skills for all three. Built on [Superpowers](https://github.com/obra/superpowers).
 
-🌐 [Tiếng Việt](README.vi.md) · [Quick Start](#-quick-start) · [Features](#-whats-inside) · [Report Bug](https://github.com/zasuozz-oss/antigravity-superpowers/issues)
+🌐 [Tiếng Việt](README.vi.md) · [Quick Start](#-quick-start) · [Features](#-whats-inside) · [Report Bug](https://github.com/zasuozz-oss/agentic-superpowers/issues)
 
 ---
 
 ## 📋 Requirements
 
-- [Google Antigravity](https://antigravity.google) (macOS / Windows / Linux)
+- One or more supported harnesses: [Claude Code](https://claude.com/claude-code), Codex, or [Google Antigravity](https://antigravity.google) (macOS / Windows / Linux)
 - Git
 - Bash (macOS/Linux) or PowerShell (Windows)
 
@@ -16,12 +16,14 @@ Customized [Superpowers](https://github.com/obra/superpowers) framework for Goog
 
 ## 🎯 What Is This?
 
-A fork of the [Superpowers](https://github.com/obra/superpowers) agentic skills framework, customized for **Google Antigravity**. Ships a complete set of skills that install globally to `~/.gemini/antigravity/`.
+A cross-platform agent skills & rules framework, built on the [Superpowers](https://github.com/obra/superpowers) skills library. One setup installs skills and global instruction blocks for **Claude Code** (`~/.claude/`), **Codex** (`~/.codex/`), and **Antigravity / Gemini** (`~/.gemini/`).
 
-**Key differences from upstream:**
-- ✅ Installs to Antigravity's native path (`~/.gemini/antigravity/`)
-- ✅ Auto-generates `~/.gemini/GEMINI.md` with skill references
-- ✅ Auto-sync fork repo when updating from upstream
+**What it adds on top of upstream:**
+- ✅ Multi-harness install — Claude Code, Codex, and Antigravity from a single setup
+- ✅ Global rule blocks: Git Workflow & Non-Blocking Execution overrides, Subagents, Language Convention, Preferred Tools
+- ✅ AKS (Karpathy guidelines) plus extra skills (gitnexus, normalize-task, Unity)
+- ✅ Auto-generates each harness's instruction file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) with a `using-superpowers` skill bootstrap
+- ✅ Syncs the upstream skills library on update
 
 ---
 
@@ -31,7 +33,7 @@ A fork of the [Superpowers](https://github.com/obra/superpowers) agentic skills 
 
 **Quick Install (recommended):**
 ```bash
-npx @zasuo/ag-s
+npx @zasuo/agentic-superpowers
 ```
 
 <details>
@@ -39,15 +41,15 @@ npx @zasuo/ag-s
 
 **macOS / Linux:**
 ```bash
-git clone https://github.com/zasuozz-oss/antigravity-superpowers.git
-cd antigravity-superpowers
+git clone https://github.com/zasuozz-oss/agentic-superpowers.git
+cd agentic-superpowers
 bash scripts/setup-global.sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-git clone https://github.com/zasuozz-oss/antigravity-superpowers.git
-cd antigravity-superpowers
+git clone https://github.com/zasuozz-oss/agentic-superpowers.git
+cd agentic-superpowers
 powershell -ExecutionPolicy Bypass -File scripts/setup-global.ps1
 ```
 
@@ -76,7 +78,7 @@ Open Antigravity in any project. Skills auto-load via `~/.gemini/GEMINI.md`.
 ## 📁 Structure
 
 ```
-antigravity-superpowers/
+agentic-superpowers/
 ├── bin/cli.mjs                  # npx installer
 ├── scripts/                     # Setup & Update scripts
 │   ├── setup-global.sh

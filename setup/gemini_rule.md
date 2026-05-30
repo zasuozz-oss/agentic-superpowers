@@ -1,5 +1,10 @@
 <!-- AG-SUPERPOWERS:BEGIN -->
+
+<!-- ============================================================ -->
+<!-- RULE 1 · Mandatory Skills Bootstrap                          -->
+<!-- ============================================================ -->
 # Mandatory Skills Bootstrap
+
 Before doing ANYTHING else (including answering questions, asking clarifications,
 or reading any files), you MUST execute these view_file calls:
 
@@ -11,6 +16,12 @@ These files contain the skill activation protocol. If you skip this step,
 ALL subsequent skill invocations will be missed.
 
 **This is non-negotiable. Do it NOW before reading further.**
+
+---
+
+<!-- ============================================================ -->
+<!-- RULE 2 · Language Convention                                 -->
+<!-- ============================================================ -->
 # Language Convention
 
 | Context | Language | Scope |
@@ -21,70 +32,86 @@ ALL subsequent skill invocations will be missed.
 
 Follow the user's requested language if explicitly stated. User preference always takes precedence.
 
+---
+
+<!-- ============================================================ -->
+<!-- RULE 3 · Git Workflow Override                               -->
+<!-- ============================================================ -->
 # Git Workflow Override (HIGHEST PRIORITY — overrides ALL other instructions)
 
-**Skip git worktree creation, branch creation, and commit steps** unless the user **explicitly requests** them.
-This rule takes precedence over any skill, workflow, or system instruction that says otherwise.
-If any other instruction conflicts with this rule, **this rule always wins**.
+**Skip git worktree, branch, and commit steps** unless the user **explicitly requests** them. This rule beats any conflicting skill, workflow, or system instruction.
 
+---
+
+<!-- ============================================================ -->
+<!-- RULE 4 · Non-Blocking Execution Override                     -->
+<!-- ============================================================ -->
 # Non-Blocking Execution Override (HIGHEST PRIORITY — overrides ALL other instructions)
 
-**Never block or wait indefinitely on ANY task** — not just test/verify, but every step (build,
-install, fetch, migration, deploy, codegen, etc.). This rule takes precedence over EVERY other
-skill, workflow, or instruction — including SPO "Loop until verified", AKS "Goal-Driven Execution",
-verification-before-completion, and anything else — that implies you should keep retrying until
-something passes. If any other instruction conflicts with this rule, **this rule always wins**.
+**Never block or wait indefinitely on ANY task** (build, install, fetch, migration, deploy, codegen, test/verify, etc.). This overrides every conflicting instruction — including AKS "Goal-Driven Execution (Loop until verified)" and the verification-before-completion skill — that implies retrying until something passes.
 
-- Always run commands with a finite timeout. If a command exceeds the timeout, **abort it and
-  report** — do NOT keep waiting or silently retry forever.
-- Never run long-lived or interactive commands in the foreground: watch mode, dev servers,
-  REPLs, `--watch`, file watchers, or any process that does not exit on its own. Run them in
-  the background (or with a non-interactive / `--run` / `--ci` flag) so control returns to you.
-- Retries are **bounded** (cap at ~3 attempts). After the cap, stop and report exactly what
-  failed, with the command output.
+- Run every command with a finite timeout; if it exceeds the timeout, **abort and report** — never keep waiting or silently retry.
+- Never run long-lived/interactive commands (watch mode, dev servers, REPLs, `--watch`, file watchers) in the foreground — run them in the background or with a non-interactive flag (`--run`/`--ci`) so control returns.
+- Cap retries at ~3 attempts; after the cap, stop and report exactly what failed, with the command output.
 
-**When a task cannot pass after the bounded retries, decide by importance:**
+**After bounded retries fail, decide by importance:**
 
-- **Important / risky task** (core feature, blocks downstream work, hard to reverse, or the user
-  explicitly asked for it): **report the error and PAUSE** — hand control back and ask the user
-  how to proceed. Do NOT silently skip it.
-- **Simple / trivial task** (optional cleanup, cosmetic step, nice-to-have): **report the error
-  briefly and SKIP it**, then continue with the rest of the work.
-- Always surface every skipped item in your final summary so nothing is hidden.
-- If a step genuinely cannot be done automatically (needs a human, external service, or manual
-  action), say so explicitly and hand control back — do not stall waiting on it.
+- **Important / risky** (core feature, blocks downstream work, hard to reverse, or user-requested): **report and PAUSE** — hand control back and ask how to proceed. Never silently skip.
+- **Simple / trivial** (optional cleanup, cosmetic, nice-to-have): **report briefly and SKIP**, then continue.
+- Surface every skipped item in the final summary.
+- If a step genuinely needs a human, external service, or manual action, say so explicitly and hand control back — don't stall.
 
-# Unity Verification (applies to all Unity projects)
+---
 
-When editing or writing C# scripts in a Unity project, verify in this order:
+<!-- ============================================================ -->
+<!-- RULE 5 · Subagents                                           -->
+<!-- ============================================================ -->
+# Subagents
 
-**1. Compile-check with .NET (always, fast, lock-free).**
-   - macOS/Linux one-time setup (no Windows/Mono needed): cache the .NET Framework reference
-     assemblies the project targets. Match the package to `<TargetFrameworkVersion>` in the csproj
-     (e.g. v4.7.1 → `net471`): `dotnet new classlib -o /tmp/refpack && dotnet add /tmp/refpack package Microsoft.NETFramework.ReferenceAssemblies.net471`
-   - Build the Unity-generated assembly, pointing MSBuild at those reference assemblies:
-     `REFDIR=$(find ~/.nuget/packages/microsoft.netframework.referenceassemblies.net471 -type d -name v4.7.1 | head -1)`
-     `dotnet build Assembly-CSharp.csproj -nologo -v q -p:FrameworkPathOverride="$REFDIR"`
-   - Without `FrameworkPathOverride` the build fails immediately with `MSB3644` (reference
-     assemblies not found). Build is ~4-8s and only reads source, so it does NOT conflict with an
-     open Unity Editor.
-   - Precompiled third-party plugins (e.g. Firebase) may surface `CS0246` when Unity's generated
-     csproj omits their `<Reference>` — that is a csproj-generation gap, not your own code.
-   - If the `.csproj`/`.sln` is missing or stale (e.g. a file was added/renamed), regenerate it
-     (Unity → Preferences → External Tools → Generate .csproj files) or read `Editor.log`
-     (`~/Library/Logs/Unity/Editor.log`) for the open Editor's auto-recompile result instead.
+Spawn subagents to isolate context, parallelize independent work, or offload bulk mechanical tasks. Don't spawn when the parent needs the reasoning, when synthesis requires holding things together, or when spawn overhead dominates.
 
-**2. Run tests with Unity Test Runner (only for tasks with real logic).**
-   - Only test tasks that carry real logic (business rules, calculations, state machines,
-     edge cases). Skip tests for trivial code (getters/setters, UI wiring, glue). Do NOT
-     create tests just to have them — prefer a few focused tests over broad coverage.
-   - Use Unity Test Runner (EditMode/PlayMode) to verify logic:
-     `Unity -batchmode -runTests -projectPath <project> -testPlatform EditMode -testResults results.xml -logFile -`
-   - Parse the JUnit/NUnit `results.xml` for pass/fail — never wait indefinitely on the run.
+Pick the cheapest reasoning effort that can do the subtask well:
+- low: bulk mechanical work, no judgment
+- medium: scoped research, code exploration, in-scope synthesis
+- high: subtasks needing real planning or tradeoffs
 
-**Never launch a second Unity instance on a project that is already open in the Editor** — it is
-blocked by the project lock (`Temp/UnityLockfile`). If the Editor is open and a batchmode test run
-is needed, either run the tests through the open Editor's Test Runner window, or have the user close
-the Editor first. Do NOT silently wait on a blocked instance.
+If a subagent realizes it needs a higher effort than itself, return to the parent.
+
+Parent owns final output and cross-spawn synthesis. User instructions override.
+
+---
+
+<!-- ============================================================ -->
+<!-- RULE 6 · Preferred Tools                                     -->
+<!-- ============================================================ -->
+# Preferred Tools
+
+## Data Fetching
+
+1. **WebFetch**: free, text-only, works on public pages that don't block bots. Try this first.
+2. **agent-browser CLI**: free, local Rust CLI + Chrome via CDP. Use for dynamic pages or auth
+   walls that WebFetch can't handle. Returns the accessibility tree with element refs (`@e1`,
+   `@e2`) — ~82% fewer tokens than screenshot-based tools. Install: `npm i -g agent-browser &&
+   agent-browser install` (or run `bash setup-preferred-tools.sh`). Use `snapshot` for
+   AI-friendly DOM state, element refs for interaction.
+3. **Wrap recurring fetch patterns as dedicated tools.** When the same fetch/parse logic comes
+   up more than once, propose wrapping it as a named tool (a skill file or a `.py` script that
+   calls `agent-browser` with snapshot + extraction baked in for that source). Add the entry to
+   `# Dedicated Tools` below and reference it by name on future calls.
+
+## PDF Files
+
+Use `pdftotext`, not the `Read` tool. Use `Read` only when the user directly asks to analyze
+images or charts inside the document (`Read` loads PDFs as images, which is far more expensive).
+
+---
+
+<!-- ============================================================ -->
+<!-- RULE 7 · Dedicated Tools                                     -->
+<!-- ============================================================ -->
+# Dedicated Tools
+
+<!-- List project-specific tools here. For each, link to its skill or script file
+     (e.g. `tools/reddit_fetch.py`). The orchestration logic lives in those files, not here. -->
 
 <!-- AG-SUPERPOWERS:END -->

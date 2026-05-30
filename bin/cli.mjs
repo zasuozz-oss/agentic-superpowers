@@ -35,8 +35,8 @@ function countItems(dir) {
 function banner() {
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════╗');
-  console.log('║     Superpowers Global Setup for Antigravity               ║');
-  console.log('║     npx @zasuo/ag-s                                      ║');
+  console.log('║     Agentic Superpowers — Global Setup                     ║');
+  console.log('║     npx @zasuo/agentic-superpowers                         ║');
   console.log('╚════════════════════════════════════════════════════════════╝');
   console.log('');
 }

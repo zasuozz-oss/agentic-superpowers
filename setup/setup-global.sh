@@ -29,13 +29,19 @@ fi
 
 BEGIN_MARKER="<!-- AG-SUPERPOWERS:BEGIN -->"
 END_MARKER="<!-- AG-SUPERPOWERS:END -->"
+UNITY_BEGIN_MARKER="<!-- AG-UNITY:BEGIN -->"
+UNITY_END_MARKER="<!-- AG-UNITY:END -->"
 
 # ─── upsert_block: replace or append a marker-delimited block in a file ───
-# Usage: upsert_block <target_file> <rule_source_file>
-# Preserves all content outside the AG-SUPERPOWERS markers.
+# Usage: upsert_block <target_file> <rule_source_file> [begin_marker] [end_marker]
+# Markers default to the AG-SUPERPOWERS pair; pass a custom pair (e.g. AG-UNITY)
+# to manage a second, independent block in the same target file.
+# Preserves all content outside the given markers.
 upsert_block() {
     local target_file="$1"
     local rule_file="$2"
+    local begin_marker="${3:-$BEGIN_MARKER}"
+    local end_marker="${4:-$END_MARKER}"
 
     [ -f "$rule_file" ] || return 1
 
@@ -43,7 +49,7 @@ upsert_block() {
     local block_content
     block_content=$(cat "$rule_file")
 
-    if [ -f "$target_file" ] && grep -qF "$BEGIN_MARKER" "$target_file"; then
+    if [ -f "$target_file" ] && grep -qF "$begin_marker" "$target_file"; then
         # Replace existing block in-place
         if [ -n "$PYTHON_CMD" ]; then
             $PYTHON_CMD -c "
@@ -60,7 +66,7 @@ if start_idx != -1 and end_idx != -1:
     content = content[:start_idx] + block + content[end_idx:]
 with open(sys.argv[1], 'w') as f:
     f.write(content)
-" "$target_file" "$BEGIN_MARKER" "$END_MARKER" "$block_content"
+" "$target_file" "$begin_marker" "$end_marker" "$block_content"
         else
             echo "   ⚠️  Python not found. Replacing entire file instead of in-place update."
             echo "$block_content" > "$target_file"
@@ -261,21 +267,22 @@ echo "📝 Step 7/8: Updating Codex rules (~/.codex/AGENTS.md)..."
 upsert_block "$CODEX_MD" "$SCRIPT_DIR/codex_rule.md"
 echo ""
 
-# Step 8: Copy SPO.md and AKS.md to platform directories
-echo "📄 Step 8/8: Copying SPO.md and AKS.md to platform directories..."
-if [ -f "$SCRIPT_DIR/SPO.md" ]; then
-    cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.gemini/SPO.md"
-    cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.claude/SPO.md"
-    cp -f "$SCRIPT_DIR/SPO.md" "$HOME/.codex/SPO.md"
-    echo "   ✓ Copied SPO.md to ~/.gemini, ~/.claude, and ~/.codex"
-elif [ -f "$SCRIPT_DIR/Spo.md" ]; then
-    cp -f "$SCRIPT_DIR/Spo.md" "$HOME/.gemini/SPO.md"
-    cp -f "$SCRIPT_DIR/Spo.md" "$HOME/.claude/SPO.md"
-    cp -f "$SCRIPT_DIR/Spo.md" "$HOME/.codex/SPO.md"
-    echo "   ✓ Copied Spo.md to ~/.gemini, ~/.claude, and ~/.codex as SPO.md"
-else
-    echo "   ⚠️  SPO.md not found in $SCRIPT_DIR!"
+# Unity rule: shared block (AG-UNITY markers) appended to all three platforms.
+# Lives in a single source file (unity_rule.md) instead of being duplicated per rule file.
+if [ -f "$SCRIPT_DIR/unity_rule.md" ]; then
+    echo "🎮 Updating shared Unity rule block (AG-UNITY)..."
+    upsert_block "$GEMINI_MD" "$SCRIPT_DIR/unity_rule.md" "$UNITY_BEGIN_MARKER" "$UNITY_END_MARKER"
+    upsert_block "$CLAUDE_MD" "$SCRIPT_DIR/unity_rule.md" "$UNITY_BEGIN_MARKER" "$UNITY_END_MARKER"
+    upsert_block "$CODEX_MD"  "$SCRIPT_DIR/unity_rule.md" "$UNITY_BEGIN_MARKER" "$UNITY_END_MARKER"
+    echo ""
 fi
+
+# Step 8: Copy AKS.md to platform directories
+# NOTE: SPO.md is intentionally NOT copied. Skill bootstrap is handled by the
+# `using-superpowers` skill (loaded via the rule files), matching the upstream
+# superpowers plugin. The old SPO.md was a mislabeled copy of upstream's
+# CLAUDE.md (contributor guidelines) and is no longer used.
+echo "📄 Step 8/8: Copying AKS.md to platform directories..."
 if [ -f "$SCRIPT_DIR/AKS.md" ]; then
     cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.gemini/AKS.md"
     cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.claude/AKS.md"

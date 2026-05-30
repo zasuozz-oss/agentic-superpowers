@@ -1,5 +1,1 @@
 using-git-worktrees
-finishing-a-development-branch
-subagent-driven-development
-dispatching-parallel-agents
-test-driven-development

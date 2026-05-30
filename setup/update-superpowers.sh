@@ -117,13 +117,10 @@ if [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
     echo "   ✓ Synced $SKILL_COUNT skills to $FORK_REPO_DIR/skills/"
     echo ""
     
-    # Replace SPO.md with upstream CLAUDE.md
-    if [ -f "$UPSTREAM_DIR/CLAUDE.md" ]; then
-        echo "📄 Replacing SPO.md with upstream CLAUDE.md..."
-        cp -f "$UPSTREAM_DIR/CLAUDE.md" "$SCRIPT_REAL_PATH/SPO.md"
-        echo "   ✓ Replaced SPO.md"
-        echo ""
-    fi
+    # NOTE: We intentionally do NOT copy upstream CLAUDE.md anywhere.
+    # Upstream CLAUDE.md is the project's *contributor/PR guidelines*, not an
+    # agent working instruction. Skill bootstrap comes from the `using-superpowers`
+    # skill instead (see rule files). The legacy SPO.md mechanism has been removed.
     echo "   📌 Remember to commit changes in the repo:"
     echo "   cd $FORK_REPO_DIR"
     echo "   git add -A && git commit -m 'chore: update skills from upstream'"

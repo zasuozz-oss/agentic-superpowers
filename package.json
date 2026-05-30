@@ -1,7 +1,7 @@
 {
-  "name": "@zasuo/ag-s",
+  "name": "@zasuo/agentic-superpowers",
   "version": "5.0.8",
-  "description": "Antigravity Superpowers — Customized skills framework for Google Antigravity",
+  "description": "Agentic Superpowers — cross-platform agent skills & rules framework for Claude Code, Codex, and Antigravity (Gemini)",
   "type": "module",
   "bin": {
     "ag-s": "bin/cli.mjs"
@@ -14,17 +14,20 @@
     "setup-global.ps1"
   ],
   "keywords": [
-    "antigravity",
+    "agentic",
     "superpowers",
-    "gemini",
-    "ai",
-    "skills"
+    "ai-agent",
+    "skills",
+    "claude-code",
+    "codex",
+    "antigravity",
+    "gemini"
   ],
   "author": "zasuozz-oss",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zasuozz-oss/antigravity-superpowers.git"
+    "url": "https://github.com/zasuozz-oss/agentic-superpowers.git"
   },
-  "homepage": "https://github.com/zasuozz-oss/antigravity-superpowers"
+  "homepage": "https://github.com/zasuozz-oss/agentic-superpowers"
 }
