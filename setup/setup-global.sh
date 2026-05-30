@@ -19,13 +19,15 @@ if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "$(uname 
     IS_WINDOWS=true
 fi
 
-# Detect python command (python3 on macOS/Linux, python on Windows)
+# Detect python command — verify it actually runs (Windows Store alias reports
+# "found" but launches the Store installer instead of a real interpreter).
 PYTHON_CMD=""
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON_CMD="python3"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON_CMD="python"
-fi
+for _py in python3 py python; do
+    if command -v "$_py" >/dev/null 2>&1 && "$_py" -c "import sys" >/dev/null 2>&1; then
+        PYTHON_CMD="$_py"
+        break
+    fi
+done
 
 BEGIN_MARKER="<!-- AG-SUPERPOWERS:BEGIN -->"
 END_MARKER="<!-- AG-SUPERPOWERS:END -->"
@@ -158,8 +160,9 @@ echo ""
 # Step 3: Install skills
 echo "📚 Step 3/8: Installing skills..."
 if command -v rsync >/dev/null 2>&1; then
-    rsync -av "$SCRIPT_DIR/../skills/" "$GLOBAL_DIR/skills/"
+    rsync -av --delete "$SCRIPT_DIR/../skills/" "$GLOBAL_DIR/skills/"
 else
+    rm -rf "$GLOBAL_DIR/skills"
     mkdir -p "$GLOBAL_DIR/skills"
     for skill_path in "$SCRIPT_DIR/../skills"/*; do
         [ -e "$skill_path" ] || continue
@@ -171,10 +174,12 @@ SKILL_COUNT=$(ls -1 "$GLOBAL_DIR/skills" | wc -l | tr -d ' ')
 echo "   ✓ $SKILL_COUNT skills installed to $GLOBAL_DIR/skills"
 
 # Mirror skills into ~/.codex/skills/ so Codex can read them via its own path
-mkdir -p "$CODEX_DIR/skills"
 if command -v rsync >/dev/null 2>&1; then
-    rsync -a "$SCRIPT_DIR/../skills/" "$CODEX_DIR/skills/"
+    mkdir -p "$CODEX_DIR/skills"
+    rsync -a --delete "$SCRIPT_DIR/../skills/" "$CODEX_DIR/skills/"
 else
+    rm -rf "$CODEX_DIR/skills"
+    mkdir -p "$CODEX_DIR/skills"
     for skill_path in "$SCRIPT_DIR/../skills"/*; do
         [ -e "$skill_path" ] || continue
         cp -R "$skill_path" "$CODEX_DIR/skills/"
@@ -185,10 +190,12 @@ echo "   ✓ $CODEX_SKILL_COUNT skills mirrored to $CODEX_DIR/skills"
 
 # Mirror skills into ~/.claude/skills/ so Claude can read them via its own path
 CLAUDE_DIR="$HOME/.claude"
-mkdir -p "$CLAUDE_DIR/skills"
 if command -v rsync >/dev/null 2>&1; then
-    rsync -a "$SCRIPT_DIR/../skills/" "$CLAUDE_DIR/skills/"
+    mkdir -p "$CLAUDE_DIR/skills"
+    rsync -a --delete "$SCRIPT_DIR/../skills/" "$CLAUDE_DIR/skills/"
 else
+    rm -rf "$CLAUDE_DIR/skills"
+    mkdir -p "$CLAUDE_DIR/skills"
     for skill_path in "$SCRIPT_DIR/../skills"/*; do
         [ -e "$skill_path" ] || continue
         cp -R "$skill_path" "$CLAUDE_DIR/skills/"
