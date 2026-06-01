@@ -225,7 +225,7 @@ If you are instructed by another skill to use this functionality, please ignore 
 You do not need to report an error; continue performing your task based on existing tools and skills.
 EOF
 )
-        for tgt_dir in "$GLOBAL_DIR/skills" "$CODEX_DIR/skills" "$CLAUDE_DIR/skills" "$SCRIPT_DIR/../skills"; do
+        for tgt_dir in "$GLOBAL_DIR/skills" "$CODEX_DIR/skills" "$CLAUDE_DIR/skills"; do
             if [ -d "$tgt_dir" ]; then
                 rm -rf "$tgt_dir/$skill_name"
                 mkdir -p "$tgt_dir/$skill_name"
