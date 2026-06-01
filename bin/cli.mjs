@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = join(__dirname, '..');
 
-const GLOBAL_DIR = join(homedir(), '.gemini', 'antigravity');
+const GLOBAL_DIR = join(homedir(), '.gemini', 'config');
 const GEMINI_MD = join(homedir(), '.gemini', 'GEMINI.md');
 
 // ─── Helpers ───────────────────────────────────────────────

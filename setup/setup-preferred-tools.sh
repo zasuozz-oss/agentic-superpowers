@@ -82,18 +82,18 @@ else
             fi
             ;;
         linux)
+            # This script never runs sudo itself — print the command for the
+            # user to run manually, so we don't escalate privileges unexpectedly.
             if have apt-get; then
-                echo "   → sudo apt-get install -y poppler-utils"
-                sudo apt-get update -y && sudo apt-get install -y poppler-utils && POPPLER_OK=true
+                echo "   → run manually:  sudo apt-get install -y poppler-utils"
             elif have dnf; then
-                echo "   → sudo dnf install -y poppler-utils"
-                sudo dnf install -y poppler-utils && POPPLER_OK=true
+                echo "   → run manually:  sudo dnf install -y poppler-utils"
             elif have pacman; then
-                echo "   → sudo pacman -S --noconfirm poppler"
-                sudo pacman -S --noconfirm poppler && POPPLER_OK=true
+                echo "   → run manually:  sudo pacman -S --noconfirm poppler"
             else
                 echo "   ✗ No supported package manager (apt-get/dnf/pacman) found."
             fi
+            echo "   ⚠ Skipping auto-install — install poppler-utils with the command above, then re-run."
             ;;
         windows)
             # Try the common Windows package managers in order.

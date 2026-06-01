@@ -2,18 +2,18 @@
 # Update Superpowers skills from upstream repository
 # Pulls latest skills from obra/superpowers, updates installed skills,
 # and syncs changes back to fork repo's global-config/skills/
-# Usage: bash ~/.gemini/antigravity/setup/update-superpowers.sh
+# Usage: bash setup/update-superpowers.sh  (run from the repo root)
 
 set -e
 
 UPSTREAM_REPO="https://github.com/obra/superpowers.git"
 UPSTREAM_BRANCH="main"
-GLOBAL_SKILLS_DIR="$HOME/.gemini/antigravity/skills"
+GLOBAL_SKILLS_DIR="$HOME/.gemini/config/skills"
 # Auto-detect fork repo location
 FORK_REPO_DIR=""
 SCRIPT_REAL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POTENTIAL_FORK="$(cd "$SCRIPT_REAL_PATH/.." && pwd)"
-GLOBAL_DIR="$HOME/.gemini/antigravity"
+GLOBAL_DIR="$HOME/.gemini/config"
 
 if [ "$POTENTIAL_FORK" != "$GLOBAL_DIR" ] && [ -d "$POTENTIAL_FORK/skills" ]; then
     FORK_REPO_DIR="$POTENTIAL_FORK"
@@ -31,7 +31,7 @@ echo ""
 
 # Step 1: Fetch upstream
 echo "🔄 Step 1: Fetching upstream (obra/superpowers)..."
-CACHE_DIR="$HOME/.gemini/antigravity/.superpowers-cache"
+CACHE_DIR="$HOME/.gemini/config/.superpowers-cache"
 echo "   Cloning upstream..."
 rm -rf "$CACHE_DIR"
 git clone --quiet --depth 1 "$UPSTREAM_REPO" "$CACHE_DIR"

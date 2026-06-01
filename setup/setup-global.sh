@@ -1,13 +1,13 @@
 #!/bin/bash
 # Global setup script for Superpowers in Antigravity
-# Installs skills and rules to ~/.gemini/antigravity/, ~/.claude/, ~/.codex/
+# Installs skills and rules to ~/.gemini/config/, ~/.claude/, ~/.codex/
 # Usage: bash setup-global.sh
 # Compatible with: macOS, Linux, Windows Git Bash
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GLOBAL_DIR="$HOME/.gemini/antigravity"
+GLOBAL_DIR="$HOME/.gemini/config"
 CODEX_DIR="$HOME/.codex"
 GEMINI_MD="$HOME/.gemini/GEMINI.md"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
@@ -85,6 +85,41 @@ with open(sys.argv[1], 'w') as f:
     fi
 }
 
+# ─── install_skills: sync THIS repo's skills into <dir>/skills ───
+# Usage: install_skills <target_root_dir>
+# Only ever creates/replaces/removes skills owned by THIS repo. Skills installed
+# by other repos or plugins in the same directory are left untouched.
+# A manifest (.ag-superpowers-manifest) records which skills this repo installed
+# so stale ones (removed from source since last run) can be pruned without a
+# blanket --delete that would wipe foreign skills.
+install_skills() {
+    local skills_dir="$1/skills"
+    local manifest="$skills_dir/.ag-superpowers-manifest"
+    mkdir -p "$skills_dir"
+
+    # Prune skills this repo installed before but no longer ships
+    if [ -f "$manifest" ]; then
+        while IFS= read -r old_skill || [ -n "$old_skill" ]; do
+            [ -z "$old_skill" ] && continue
+            if [ ! -d "$SCRIPT_DIR/../skills/$old_skill" ]; then
+                rm -rf "$skills_dir/$old_skill"
+            fi
+        done < "$manifest"
+    fi
+
+    # Copy/refresh current skills, rewriting the manifest
+    : > "$manifest.tmp"
+    for skill_path in "$SCRIPT_DIR/../skills"/*/; do
+        [ -d "$skill_path" ] || continue
+        local name
+        name=$(basename "$skill_path")
+        rm -rf "$skills_dir/$name"
+        cp -R "$skill_path" "$skills_dir/$name"
+        echo "$name" >> "$manifest.tmp"
+    done
+    mv "$manifest.tmp" "$manifest"
+}
+
 
 
 
@@ -158,49 +193,21 @@ echo "   ✓ $SKILL_SRC_COUNT skills checked, no duplicates"
 echo ""
 
 # Step 3: Install skills
+# Per-skill copy only — never touches skills owned by other repos/plugins that
+# share the same skills directory.
 echo "📚 Step 3/8: Installing skills..."
-if command -v rsync >/dev/null 2>&1; then
-    rsync -av --delete "$SCRIPT_DIR/../skills/" "$GLOBAL_DIR/skills/"
-else
-    rm -rf "$GLOBAL_DIR/skills"
-    mkdir -p "$GLOBAL_DIR/skills"
-    for skill_path in "$SCRIPT_DIR/../skills"/*; do
-        [ -e "$skill_path" ] || continue
-        cp -R "$skill_path" "$GLOBAL_DIR/skills/"
-    done
-fi
-
+install_skills "$GLOBAL_DIR"
 SKILL_COUNT=$(ls -1 "$GLOBAL_DIR/skills" | wc -l | tr -d ' ')
 echo "   ✓ $SKILL_COUNT skills installed to $GLOBAL_DIR/skills"
 
 # Mirror skills into ~/.codex/skills/ so Codex can read them via its own path
-if command -v rsync >/dev/null 2>&1; then
-    mkdir -p "$CODEX_DIR/skills"
-    rsync -a --delete "$SCRIPT_DIR/../skills/" "$CODEX_DIR/skills/"
-else
-    rm -rf "$CODEX_DIR/skills"
-    mkdir -p "$CODEX_DIR/skills"
-    for skill_path in "$SCRIPT_DIR/../skills"/*; do
-        [ -e "$skill_path" ] || continue
-        cp -R "$skill_path" "$CODEX_DIR/skills/"
-    done
-fi
+install_skills "$CODEX_DIR"
 CODEX_SKILL_COUNT=$(ls -1 "$CODEX_DIR/skills" | wc -l | tr -d ' ')
 echo "   ✓ $CODEX_SKILL_COUNT skills mirrored to $CODEX_DIR/skills"
 
 # Mirror skills into ~/.claude/skills/ so Claude can read them via its own path
 CLAUDE_DIR="$HOME/.claude"
-if command -v rsync >/dev/null 2>&1; then
-    mkdir -p "$CLAUDE_DIR/skills"
-    rsync -a --delete "$SCRIPT_DIR/../skills/" "$CLAUDE_DIR/skills/"
-else
-    rm -rf "$CLAUDE_DIR/skills"
-    mkdir -p "$CLAUDE_DIR/skills"
-    for skill_path in "$SCRIPT_DIR/../skills"/*; do
-        [ -e "$skill_path" ] || continue
-        cp -R "$skill_path" "$CLAUDE_DIR/skills/"
-    done
-fi
+install_skills "$CLAUDE_DIR"
 CLAUDE_SKILL_COUNT=$(ls -1 "$CLAUDE_DIR/skills" | wc -l | tr -d ' ')
 echo "   ✓ $CLAUDE_SKILL_COUNT skills mirrored to $CLAUDE_DIR/skills"
 
@@ -238,39 +245,18 @@ fi
 
 echo ""
 
-# Step 4: Install scripts
-echo "⚙️  Step 4/8: Installing setup scripts..."
-if command -v rsync >/dev/null 2>&1; then
-    rsync -av --delete "$SCRIPT_DIR/" "$GLOBAL_DIR/setup/" --exclude="setup-global.sh" --exclude="setup-global.ps1" --exclude="ignore-skills.txt"
-else
-    mkdir -p "$GLOBAL_DIR/setup"
-    for file in "$SCRIPT_DIR"/*; do
-        [ -e "$file" ] || continue
-        fname=$(basename "$file")
-        if [ "$fname" != "setup-global.sh" ] && [ "$fname" != "setup-global.ps1" ] && [ "$fname" != "ignore-skills.txt" ]; then
-            cp -R "$file" "$GLOBAL_DIR/setup/"
-        fi
-    done
-fi
-if [ "$IS_WINDOWS" != true ]; then
-    chmod +x "$GLOBAL_DIR/setup"/*.sh 2>/dev/null || true
-fi
-SCRIPT_COUNT=$(ls -1 "$GLOBAL_DIR/setup" | wc -l | tr -d ' ')
-echo "   ✓ $SCRIPT_COUNT setup scripts installed"
-echo ""
-
-# Step 5: Update GEMINI.md (Antigravity)
-echo "📝 Step 5/8: Updating Antigravity rules (~/.gemini/GEMINI.md)..."
+# Step 4: Update GEMINI.md (Antigravity)
+echo "📝 Step 4/7: Updating Antigravity rules (~/.gemini/GEMINI.md)..."
 upsert_block "$GEMINI_MD" "$SCRIPT_DIR/gemini_rule.md"
 echo ""
 
-# Step 6: Update CLAUDE.md (Claude Code)
-echo "📝 Step 6/8: Updating Claude Code rules (~/.claude/CLAUDE.md)..."
+# Step 5: Update CLAUDE.md (Claude Code)
+echo "📝 Step 5/7: Updating Claude Code rules (~/.claude/CLAUDE.md)..."
 upsert_block "$CLAUDE_MD" "$SCRIPT_DIR/claude_rule.md"
 echo ""
 
-# Step 7: Update AGENTS.md (Codex)
-echo "📝 Step 7/8: Updating Codex rules (~/.codex/AGENTS.md)..."
+# Step 6: Update AGENTS.md (Codex)
+echo "📝 Step 6/7: Updating Codex rules (~/.codex/AGENTS.md)..."
 upsert_block "$CODEX_MD" "$SCRIPT_DIR/codex_rule.md"
 echo ""
 
@@ -284,12 +270,12 @@ if [ -f "$SCRIPT_DIR/unity_rule.md" ]; then
     echo ""
 fi
 
-# Step 8: Copy AKS.md to platform directories
+# Step 7: Copy AKS.md to platform directories
 # NOTE: SPO.md is intentionally NOT copied. Skill bootstrap is handled by the
 # `using-superpowers` skill (loaded via the rule files), matching the upstream
 # superpowers plugin. The old SPO.md was a mislabeled copy of upstream's
 # CLAUDE.md (contributor guidelines) and is no longer used.
-echo "📄 Step 8/8: Copying AKS.md to platform directories..."
+echo "📄 Step 7/7: Copying AKS.md to platform directories..."
 if [ -f "$SCRIPT_DIR/AKS.md" ]; then
     cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.gemini/AKS.md"
     cp -f "$SCRIPT_DIR/AKS.md" "$HOME/.claude/AKS.md"
@@ -300,10 +286,11 @@ else
 fi
 echo ""
 
-# Cleanup old legacy directories if present
-if [ -d "$GLOBAL_DIR/rules" ] || [ -d "$GLOBAL_DIR/global_workflows" ]; then
+# Cleanup old legacy directories if present (including the old setup/ copy —
+# scripts are no longer installed to GLOBAL_DIR; run them from the repo)
+if [ -d "$GLOBAL_DIR/rules" ] || [ -d "$GLOBAL_DIR/global_workflows" ] || [ -d "$GLOBAL_DIR/setup" ]; then
     echo "🧹 Cleaning up legacy directories..."
-    rm -rf "$GLOBAL_DIR/rules" "$GLOBAL_DIR/global_workflows"
+    rm -rf "$GLOBAL_DIR/rules" "$GLOBAL_DIR/global_workflows" "$GLOBAL_DIR/setup"
     echo "   ✓ Removed legacy directories"
     echo ""
 fi
@@ -311,9 +298,7 @@ fi
 # Verify
 echo "✅ Verification..."
 SKILL_TOTAL=$(ls -1 "$GLOBAL_DIR/skills" | wc -l | tr -d ' ')
-SCRIPT_TOTAL=$(ls -1 "$GLOBAL_DIR/setup" | wc -l | tr -d ' ')
 echo "   Skills:        $SKILL_TOTAL"
-echo "   Setup Scripts: $SCRIPT_TOTAL"
 if [ -f "$GEMINI_MD" ]; then echo "   GEMINI.md:     ✓"; else echo "   GEMINI.md:     ✗"; fi
 if [ -f "$CLAUDE_MD" ]; then echo "   CLAUDE.md:     ✓"; else echo "   CLAUDE.md:     ✗"; fi
 if [ -f "$CODEX_MD" ]; then echo "   AGENTS.md:     ✓"; else echo "   AGENTS.md:     ✗"; fi

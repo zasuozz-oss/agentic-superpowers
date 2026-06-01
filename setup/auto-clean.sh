@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-GLOBAL_DIR="$HOME/.gemini/antigravity"
+GLOBAL_DIR="$HOME/.gemini/config"
 CODEX_DIR="$HOME/.codex"
 CLAUDE_DIR="$HOME/.claude"
 
@@ -48,12 +48,23 @@ fi
 
 echo ""
 echo "🧹 Step 1/2: Removing installed skills from all platforms..."
+# Only remove skills THIS repo installed (tracked in .ag-superpowers-manifest).
+# Skills from other repos/plugins in the same directory are left untouched.
 for dir in "$GLOBAL_DIR/skills" "$CODEX_DIR/skills" "$CLAUDE_DIR/skills"; do
-    if [ -d "$dir" ]; then
-        rm -rf "$dir/"*
-        echo "   ✓ Skills removed from $dir"
-    else
+    manifest="$dir/.ag-superpowers-manifest"
+    if [ ! -d "$dir" ]; then
         echo "   ✓ No skills folder found at $dir"
+        continue
+    fi
+    if [ -f "$manifest" ]; then
+        while IFS= read -r skill || [ -n "$skill" ]; do
+            [ -z "$skill" ] && continue
+            rm -rf "$dir/$skill"
+        done < "$manifest"
+        rm -f "$manifest"
+        echo "   ✓ Removed this repo's skills from $dir"
+    else
+        echo "   ⚠️  No manifest at $dir — skipping (cannot tell which skills are ours)"
     fi
 done
 

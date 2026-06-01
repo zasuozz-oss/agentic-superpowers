@@ -91,18 +91,17 @@ agentic-superpowers/
 **Sau khi cài đặt:**
 ```
 ~/.gemini/
-├── GEMINI.md                    # Global config (tự tạo)
-└── antigravity/
+├── GEMINI.md                    # Global config (auto-generated)
+└── config/
     ├── skills/                  # Các skills đã cài đặt
-    └── scripts/                 # Setup scripts
-```
+    └── setup/                   # Setup scripts
 
 ---
 
 ## 🔄 Cập Nhật
 
 ```bash
-bash ~/.gemini/antigravity/scripts/update-superpowers.sh
+bash ~/.gemini/config/setup/update-superpowers.sh
 ```
 
 Tự động pull skills từ upstream, cập nhật bản cài đặt, và đồng bộ ngược vào fork repo.

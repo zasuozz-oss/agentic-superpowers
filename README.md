@@ -92,17 +92,16 @@ agentic-superpowers/
 ```
 ~/.gemini/
 ├── GEMINI.md                    # Global config (auto-generated)
-└── antigravity/
+└── config/
     ├── skills/                  # Installed skills
-    └── scripts/                 # Setup scripts
-```
+    └── setup/                   # Setup scripts
 
 ---
 
 ## 🔄 Updating
 
 ```bash
-bash ~/.gemini/antigravity/scripts/update-superpowers.sh
+bash ~/.gemini/config/setup/update-superpowers.sh
 ```
 
 Updates installed skills from upstream and auto-syncs back to fork repo.
