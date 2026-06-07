@@ -1,0 +1,6 @@
+# Custom skills — local-only, deployed alongside upstream skills.
+# Skills NOT listed here AND NOT in upstream (superpowers/skills/) are skipped during setup.
+# Add a skill folder name here to include it in ~/.claude/skills/ and ~/.codex/skills/.
+# Lines starting with # are comments. Trailing slashes are stripped automatically.
+karpathy-guidelines
+using-subagents

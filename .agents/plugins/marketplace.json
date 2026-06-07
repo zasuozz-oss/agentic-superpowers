@@ -1,0 +1,12 @@
+{
+  "name": "superpowers-dev",
+  "interface": { "displayName": "Superpowers" },
+  "plugins": [
+    {
+      "name": "superpowers",
+      "source": { "source": "local", "path": "./superpowers" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_USE" },
+      "category": "Coding"
+    }
+  ]
+}

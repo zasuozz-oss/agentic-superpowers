@@ -34,6 +34,147 @@ END_MARKER="<!-- AG-SUPERPOWERS:END -->"
 UNITY_BEGIN_MARKER="<!-- AG-UNITY:BEGIN -->"
 UNITY_END_MARKER="<!-- AG-UNITY:END -->"
 
+# ─── Custom skill filtering ─────────────────────────────────────────────────
+# custom-skill.txt lists local-only skills (not from upstream) to deploy.
+# Skills absent from both upstream and custom-skill.txt are skipped.
+CUSTOM_SKILLS_FILE="$SCRIPT_DIR/custom-skill.txt"
+UPSTREAM_SKILLS_DIR="$SCRIPT_DIR/../superpowers/skills"
+CUSTOM_SKILL_NAMES=()
+if [ -f "$CUSTOM_SKILLS_FILE" ]; then
+    while read -r _cs_line || [ -n "$_cs_line" ]; do
+        _cs_line="$(printf '%s' "$_cs_line" | tr -d '\r')"
+        _cs_line="$(echo "$_cs_line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -z "$_cs_line" || "$_cs_line" == \#* ]] && continue
+        CUSTOM_SKILL_NAMES+=("${_cs_line%/}")
+    done < "$CUSTOM_SKILLS_FILE"
+fi
+
+_should_deploy_skill() {
+    local _name="$1"
+    [ -d "$UPSTREAM_SKILLS_DIR/$_name" ] && return 0
+    for _cs in "${CUSTOM_SKILL_NAMES[@]}"; do
+        [ "$_cs" = "$_name" ] && return 0
+    done
+    [ ! -f "$CUSTOM_SKILLS_FILE" ] && return 0
+    return 1
+}
+
+# Copy only the skills Claude/Codex need ON DISK alongside the native plugin:
+#   - using-superpowers : required by the @import bootstrap in the rule files
+#   - every name in custom-skill.txt : local-only skills not provided by upstream
+# Replaces ONLY those specific folders — never wipes the whole skills dir, so a
+# user's own skills in ~/.claude/skills or ~/.codex/skills are preserved.
+# Also removes stale upstream skill copies left by older full-copy setups: any
+# folder whose name matches an upstream skill (now served by the native plugin)
+# and is NOT in the keep-list is deleted to avoid duplicate skill discovery.
+_install_custom_skills() {
+    local _dest="$1"
+    mkdir -p "$_dest"
+    local _keep=("using-superpowers" "${CUSTOM_SKILL_NAMES[@]}")
+
+    # Cleanup: drop redundant on-disk copies of upstream skills.
+    local _up _upn _k _is_kept
+    for _up in "$SCRIPT_DIR/../superpowers/skills"/*/; do
+        [ -d "$_up" ] || continue
+        _upn="$(basename "$_up")"
+        _is_kept=false
+        for _k in "${_keep[@]}"; do
+            [ "$_upn" = "$_k" ] && { _is_kept=true; break; }
+        done
+        if [ "$_is_kept" = false ] && [ -d "$_dest/$_upn" ]; then
+            rm -rf "$_dest/$_upn"
+        fi
+    done
+
+    # Install the keep-list folders (sourced from the repo's skills/).
+    local _n
+    for _n in "${_keep[@]}"; do
+        if [ -d "$SCRIPT_DIR/../skills/$_n" ]; then
+            rm -rf "$_dest/$_n"
+            cp -R "$SCRIPT_DIR/../skills/$_n" "$_dest/$_n"
+        fi
+    done
+}
+
+# Convert a Git Bash (/c/...) path to a native Windows path so the Node/Rust
+# CLIs (claude, codex) receive a path they can resolve. No-op off Windows.
+_winpath() {
+    if [ "$IS_WINDOWS" = true ] && command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$1"
+    else
+        printf '%s' "$1"
+    fi
+}
+
+# Run a command with a finite timeout when `timeout` is available; never hang.
+_run_bounded() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 180 "$@"
+    else
+        "$@"
+    fi
+}
+
+# Install the upstream superpowers plugin natively (marketplace add + install)
+# for Claude or Codex — the "install via hook" path: the plugin provides all
+# upstream skills (and, on Claude, the SessionStart bootstrap hook), so no skills
+# are copied. The two CLIs read DIFFERENT marketplace manifests:
+#   Claude → superpowers/.claude-plugin/marketplace.json  (plugin source "./")
+#   Codex  → <repo-root>/.agents/plugins/marketplace.json (plugin source "./superpowers";
+#            Codex requires the plugin in a SUBDIR, so the repo root is the market root)
+# Codex does NOT consume the Claude-format hooks.json, so its bootstrap comes from
+# the @import in AGENTS.md (the on-disk fallback) rather than a native hook.
+# $1 = claude | codex
+_install_plugin() {
+    local _tool="$1"
+    local _repo_root="$SCRIPT_DIR/.."
+
+    case "$_tool" in
+        claude)
+            if [ ! -f "$_repo_root/superpowers/.claude-plugin/marketplace.json" ]; then
+                echo "   ⚠️  claude: superpowers/.claude-plugin/marketplace.json missing — run update-superpowers.sh first. Skipping."
+                return 0
+            fi
+            if ! command -v claude >/dev/null 2>&1; then
+                echo "   ⚠️  'claude' CLI not found — skipping native plugin install"
+                return 0
+            fi
+            local _src
+            _src="$(_winpath "$_repo_root/superpowers")"
+            _run_bounded claude plugin marketplace add "$_src" --scope user >/dev/null 2>&1 \
+                || _run_bounded claude plugin marketplace update superpowers-dev >/dev/null 2>&1 || true
+            if _run_bounded claude plugin install superpowers@superpowers-dev --scope user >/dev/null 2>&1; then
+                echo "   ✓ Claude: superpowers plugin installed (hook + upstream skills)"
+            else
+                echo "   ⚠️  Claude plugin install failed. Run manually:"
+                echo "        claude plugin marketplace add \"$_src\" && claude plugin install superpowers@superpowers-dev"
+            fi
+            ;;
+        codex)
+            if [ ! -f "$_repo_root/.agents/plugins/marketplace.json" ]; then
+                echo "   ⚠️  codex: .agents/plugins/marketplace.json missing at repo root. Skipping."
+                return 0
+            fi
+            if ! command -v codex >/dev/null 2>&1; then
+                echo "   ⚠️  'codex' CLI not found — skipping native plugin install"
+                return 0
+            fi
+            local _src
+            _src="$(_winpath "$_repo_root")"
+            # Local marketplaces don't refresh via `upgrade` (Git-only) — remove + re-add
+            # to pick up a changed manifest snapshot.
+            _run_bounded codex plugin marketplace remove superpowers-dev >/dev/null 2>&1 || true
+            _run_bounded codex plugin marketplace add "$_src" >/dev/null 2>&1 || true
+            if _run_bounded codex plugin add superpowers@superpowers-dev >/dev/null 2>&1; then
+                echo "   ✓ Codex: superpowers plugin installed (upstream skills; bootstrap via AGENTS.md @import)"
+            else
+                echo "   ⚠️  Codex plugin add failed. Run manually:"
+                echo "        codex plugin marketplace add \"$_src\" && codex plugin add superpowers@superpowers-dev"
+            fi
+            ;;
+    esac
+}
+
 # ─── upsert_block: replace or append a marker-delimited block in a file ───
 # Usage: upsert_block <target_file> <rule_source_file> [begin_marker] [end_marker]
 # Markers default to the AG-SUPERPOWERS pair; pass a custom pair (e.g. AG-UNITY)
@@ -193,33 +334,49 @@ echo "   ✓ $SKILL_SRC_COUNT skills checked, no duplicates"
 echo ""
 
 # Step 3: Install skills
-# Per-skill copy only — never touches skills owned by other repos/plugins that
-# share the same skills directory.
+#   Antigravity (Gemini): NO plugin/hook system → gets a FULL copy of every skill.
+#   Claude + Codex: install the upstream superpowers PLUGIN natively (ships the
+#     SessionStart bootstrap hook + all upstream skills) and copy only the custom
+#     skills (+ using-superpowers for the @import bootstrap) onto disk.
 echo "📚 Step 3/8: Installing skills..."
+CLAUDE_DIR="$HOME/.claude"
+
+# Warn about orphan skills (not upstream and not in custom-skill.txt)
+_orphans=()
+for _sp in "$SCRIPT_DIR/../skills"/*/; do
+    [ -d "$_sp" ] || continue
+    _sn="$(basename "$_sp")"
+    _should_deploy_skill "$_sn" || _orphans+=("$_sn")
+done
+[ ${#_orphans[@]} -gt 0 ] && echo "   ℹ️  Orphan skills skipped (add to custom-skill.txt to deploy): ${_orphans[*]}"
+
+# ── Antigravity: full copy of all skills (manifest-based, foreign-skill safe) ─
 install_skills "$GLOBAL_DIR"
 SKILL_COUNT=$(ls -1 "$GLOBAL_DIR/skills" | wc -l | tr -d ' ')
-echo "   ✓ $SKILL_COUNT skills installed to $GLOBAL_DIR/skills"
+echo "   ✓ Antigravity: $SKILL_COUNT skills copied to $GLOBAL_DIR/skills"
 
-# Mirror skills into ~/.codex/skills/ so Codex can read them via its own path
-install_skills "$CODEX_DIR"
-CODEX_SKILL_COUNT=$(ls -1 "$CODEX_DIR/skills" | wc -l | tr -d ' ')
-echo "   ✓ $CODEX_SKILL_COUNT skills mirrored to $CODEX_DIR/skills"
+# ── Claude + Codex: native plugin install (upstream via hook) ──────────────
+echo "   🔌 Installing upstream superpowers plugin (Claude & Codex)..."
+_install_plugin claude
+_install_plugin codex
 
-# Mirror skills into ~/.claude/skills/ so Claude can read them via its own path
-CLAUDE_DIR="$HOME/.claude"
-install_skills "$CLAUDE_DIR"
-CLAUDE_SKILL_COUNT=$(ls -1 "$CLAUDE_DIR/skills" | wc -l | tr -d ' ')
-echo "   ✓ $CLAUDE_SKILL_COUNT skills mirrored to $CLAUDE_DIR/skills"
+# ── Claude + Codex: custom skills (+ using-superpowers bootstrap) on disk ───
+_install_custom_skills "$CODEX_DIR/skills"
+_install_custom_skills "$CLAUDE_DIR/skills"
+echo "   ✓ Custom skills copied to ~/.claude/skills and ~/.codex/skills: using-superpowers ${CUSTOM_SKILL_NAMES[*]}"
 
-# Apply stubs for ignored skills
-echo "🛡️  Applying stubs for ignored skills..."
+# Apply stubs for ignored skills.
+# Only the Antigravity full copy and the repo source need stubbing — Claude/Codex
+# run the native plugin (pristine upstream); their disabled-skill behavior is
+# governed by the rule files / CLAUDE.md overrides, not by on-disk stubs.
+echo "🛡️  Applying stubs for ignored skills (Antigravity + repo source)..."
 if [ -f "$SCRIPT_DIR/ignore-skills.txt" ]; then
     while read -r line || [ -n "$line" ]; do
         line="$(printf '%s' "$line" | tr -d '\r')"
         line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         [[ -z "$line" || "$line" == \#* ]] && continue
         skill_name="${line%/}"
-        
+
         stub_content=$(cat <<EOF
 ---
 name: $skill_name
@@ -232,7 +389,7 @@ If you are instructed by another skill to use this functionality, please ignore 
 You do not need to report an error; continue performing your task based on existing tools and skills.
 EOF
 )
-        for tgt_dir in "$GLOBAL_DIR/skills" "$CODEX_DIR/skills" "$CLAUDE_DIR/skills"; do
+        for tgt_dir in "$GLOBAL_DIR/skills" "$SCRIPT_DIR/../skills"; do
             if [ -d "$tgt_dir" ]; then
                 rm -rf "$tgt_dir/$skill_name"
                 mkdir -p "$tgt_dir/$skill_name"
@@ -310,7 +467,12 @@ echo "║     Installation Complete                                  ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "🚀 Next steps:"
-echo "   1. Restart Antigravity / Claude Desktop / Codex"
+echo "   1. Restart Antigravity / Claude Code / Codex"
 echo "   2. Rules auto-load from global instruction files"
+echo "   3. Claude/Codex: the superpowers plugin loads upstream skills + the"
+echo "      SessionStart bootstrap hook. Verify with:"
+echo "        claude plugin list        # expect: superpowers@superpowers-dev"
+echo "        codex  plugin list        # expect: superpowers"
+echo "   4. Antigravity gets the full skill copy under ~/.gemini/config/skills"
 echo ""
 echo "✅ Done!"

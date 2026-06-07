@@ -101,18 +101,23 @@ echo "📝 Step 3: Syncing updates to local repository..."
 
 if [ -n "$FORK_REPO_DIR" ] && [ -d "$FORK_REPO_DIR/skills" ]; then
     echo "🔄 Syncing upstream skills into $FORK_REPO_DIR/skills..."
+    # Build combined exclude list: ignored skills + custom skills (protected from upstream overwrite)
+    _EXCL_TMP=$(mktemp)
+    grep -v '^#' "$SCRIPT_REAL_PATH/ignore-skills.txt" >> "$_EXCL_TMP" 2>/dev/null || true
+    grep -v '^#' "$SCRIPT_REAL_PATH/custom-skill.txt" >> "$_EXCL_TMP" 2>/dev/null || true
     if command -v rsync >/dev/null 2>&1; then
-        rsync -av --exclude-from="$SCRIPT_REAL_PATH/ignore-skills.txt" "$UPSTREAM_DIR/skills/" "$FORK_REPO_DIR/skills/"
+        rsync -av --exclude-from="$_EXCL_TMP" "$UPSTREAM_DIR/skills/" "$FORK_REPO_DIR/skills/"
     else
         mkdir -p "$FORK_REPO_DIR/skills"
         for skill_path in "$UPSTREAM_DIR/skills"/*; do
             [ -e "$skill_path" ] || continue
             skill_name=$(basename "$skill_path")
-            if ! grep -qE "^${skill_name}/?(\r)?$" "$SCRIPT_REAL_PATH/ignore-skills.txt" 2>/dev/null; then
+            if ! grep -qE "^${skill_name}/?(\r)?$" "$_EXCL_TMP" 2>/dev/null; then
                 cp -R "$skill_path" "$FORK_REPO_DIR/skills/"
             fi
         done
     fi
+    rm -f "$_EXCL_TMP"
     SKILL_COUNT=$(ls -1 "$FORK_REPO_DIR/skills/" | wc -l | tr -d ' ')
     echo "   ✓ Synced $SKILL_COUNT skills to $FORK_REPO_DIR/skills/"
     echo ""

@@ -5,6 +5,11 @@
 <!-- ============================================================ -->
 # Mandatory Skills Bootstrap
 
+The Superpowers plugin is installed natively (Claude marketplace `superpowers-dev`).
+Its SessionStart hook auto-loads the `using-superpowers` bootstrap and makes every
+upstream skill discoverable. The import below is the on-disk fallback that
+guarantees the bootstrap even if the plugin hook does not run.
+
 @~/.claude/skills/using-superpowers/SKILL.md
 @~/.claude/AKS.md
 

@@ -5,6 +5,11 @@
 <!-- ============================================================ -->
 # Mandatory Skills Bootstrap
 
+The Superpowers plugin is installed natively (Codex marketplace `superpowers-dev`).
+Its session_start hook auto-loads the `using-superpowers` bootstrap and makes every
+upstream skill discoverable. The imports below are the on-disk fallback that
+guarantee the bootstrap even if the plugin hook does not run.
+
 @~/.codex/skills/using-superpowers/SKILL.md
 @~/.codex/skills/using-superpowers/references/codex-tools.md
 @~/.codex/AKS.md
