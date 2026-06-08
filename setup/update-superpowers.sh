@@ -23,6 +23,59 @@ fi
 
 UPSTREAM_DIR="$FORK_REPO_DIR/superpowers"
 
+# Check if a directory tree can be written to (create/replace/delete files).
+_is_writable_recursive() {
+    local _dir="$1"
+    [ -d "$_dir" ] || return 0
+    [ ! -w "$_dir" ] && return 1
+    # Only DIRECTORY write permission governs creating/replacing/deleting files
+    # inside it — a read-only file (e.g. a 0444 git pack) can still be removed
+    # via its writable parent dir. So we check directories only, and prune
+    # subtrees we never write into that legitimately contain read-only entries
+    # (git internals, code-signed .app bundles, dependency caches). Scanning
+    # every file used to misreport those as "permission denied".
+    local _d
+    while IFS= read -r -d '' _d; do
+        if [ ! -w "$_d" ]; then
+            return 1
+        fi
+    done < <(find "$_dir" \( -name '.git' -o -name '*.app' -o -name 'node_modules' \) -prune -o -type d -print0 2>/dev/null)
+    return 0
+}
+
+# Detect OS for platform-specific permission suggestions
+IS_WINDOWS=false
+if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "$(uname -s)" == CYGWIN* ]]; then
+    IS_WINDOWS=true
+fi
+
+# Check permissions before doing any write operations
+PERM_ERRORS=""
+CHECK_DIRS=("$GLOBAL_DIR")
+if [ -n "$FORK_REPO_DIR" ]; then
+    CHECK_DIRS+=("$FORK_REPO_DIR/skills" "$FORK_REPO_DIR/superpowers")
+fi
+
+for dir in "${CHECK_DIRS[@]}"; do
+    if [ -d "$dir" ] && ! _is_writable_recursive "$dir"; then
+        if [ "$IS_WINDOWS" = true ]; then
+            PERM_ERRORS="$PERM_ERRORS
+      icacls \"$(cygpath -w "$dir")\" /grant %USERNAME%:F /T"
+        else
+            PERM_ERRORS="$PERM_ERRORS
+      sudo chown -R \$(whoami) \"$dir\""
+        fi
+    fi
+done
+
+if [ -n "$PERM_ERRORS" ]; then
+    echo "❌ Permission denied on some directories or files."
+    echo "   Run these commands first to fix ownership, then re-run setup:"
+    echo "$PERM_ERRORS"
+    echo ""
+    exit 1
+fi
+
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║     Superpowers Update Workflow                           ║"
 echo "║     Pull upstream → Update installed → Sync fork repo     ║"

@@ -115,6 +115,26 @@ _run_bounded() {
     fi
 }
 
+# Check if a directory and all its contents are writable.
+_is_writable_recursive() {
+    local _dir="$1"
+    [ -d "$_dir" ] || return 0
+    [ ! -w "$_dir" ] && return 1
+    # Only DIRECTORY write permission governs creating/replacing/deleting files
+    # inside it — a read-only file (e.g. a 0444 git pack) can still be removed
+    # via its writable parent dir. So we check directories only, and prune
+    # subtrees the setup never writes into that legitimately contain read-only
+    # entries (git internals, code-signed .app bundles, dependency caches).
+    # Scanning every file used to misreport those as "permission denied".
+    local _d
+    while IFS= read -r -d '' _d; do
+        if [ ! -w "$_d" ]; then
+            return 1
+        fi
+    done < <(find "$_dir" \( -name '.git' -o -name '*.app' -o -name 'node_modules' \) -prune -o -type d -print0 2>/dev/null)
+    return 0
+}
+
 # Install the upstream superpowers plugin natively (marketplace add + install)
 # for Claude or Codex — the "install via hook" path: the plugin provides all
 # upstream skills (and, on Claude, the SessionStart bootstrap hook), so no skills
@@ -270,6 +290,40 @@ echo "║     Install skills & rules globally                        ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
+# Check if source directories exist
+if [ ! -d "$SCRIPT_DIR/../skills" ]; then
+    echo "❌ Error: skills/ not found"
+    echo "   Make sure you are running this from the repository root"
+    exit 1
+fi
+
+# Step 1/8: Create directories & check permissions
+echo "📁 Step 1/8: Creating config directories & checking permissions..."
+mkdir -p "$GLOBAL_DIR" "$CODEX_DIR" "$(dirname "$GEMINI_MD")" "$(dirname "$CLAUDE_MD")"
+
+PERM_ERRORS=""
+for dir in "$GLOBAL_DIR" "$CODEX_DIR" "$(dirname "$GEMINI_MD")" "$(dirname "$CLAUDE_MD")" "$SCRIPT_DIR/../skills" "$SCRIPT_DIR/../superpowers"; do
+    if [ -d "$dir" ] && ! _is_writable_recursive "$dir"; then
+        if [ "$IS_WINDOWS" = true ]; then
+            PERM_ERRORS="$PERM_ERRORS
+      icacls \"$(cygpath -w "$dir")\" /grant %USERNAME%:F /T"
+        else
+            PERM_ERRORS="$PERM_ERRORS
+      sudo chown -R \$(whoami) \"$dir\""
+        fi
+    fi
+done
+
+if [ -n "$PERM_ERRORS" ]; then
+    echo "   ❌ Permission denied on some directories or files."
+    echo "   Run these commands first to fix ownership, then re-run setup:"
+    echo "$PERM_ERRORS"
+    echo ""
+    exit 1
+fi
+echo "   ✓ All directories ready"
+echo ""
+
 read -p "Do you want to run update-superpowers.sh first to fetch the latest upstream skills? (y/n): " run_update
 if [ "$run_update" = "y" ] || [ "$run_update" = "yes" ]; then
     echo "🔄 Running update-superpowers.sh..."
@@ -281,40 +335,6 @@ if [ "$run_update" = "y" ] || [ "$run_update" = "yes" ]; then
     echo "✅ Update step finished. Proceeding with setup..."
     echo ""
 fi
-
-# Check if source directories exist
-if [ ! -d "$SCRIPT_DIR/../skills" ]; then
-    echo "❌ Error: skills/ not found"
-    echo "   Make sure you are running this from the repository root"
-    exit 1
-fi
-
-# Step 1: Create directories & check permissions
-echo "📁 Step 1/8: Creating config directories..."
-mkdir -p "$GLOBAL_DIR" "$CODEX_DIR" "$(dirname "$GEMINI_MD")" "$(dirname "$CLAUDE_MD")"
-
-PERM_ERRORS=""
-for dir in "$GLOBAL_DIR" "$CODEX_DIR" "$(dirname "$GEMINI_MD")" "$(dirname "$CLAUDE_MD")"; do
-    if [ ! -w "$dir" ]; then
-        if [ "$IS_WINDOWS" = true ]; then
-            PERM_ERRORS="$PERM_ERRORS
-      icacls \"$(cygpath -w "$dir")\" /grant %USERNAME%:F /T"
-        else
-            PERM_ERRORS="$PERM_ERRORS
-      sudo chown -R $(whoami) $dir"
-        fi
-    fi
-done
-
-if [ -n "$PERM_ERRORS" ]; then
-    echo "   ❌ Permission denied on some directories."
-    echo "   Run these commands first, then re-run setup:"
-    echo "$PERM_ERRORS"
-    echo ""
-    exit 1
-fi
-echo "   ✓ All directories ready"
-echo ""
 
 # Step 2: Check for duplicate skill names
 echo "🔍 Step 2/8: Checking for duplicate skills..."
@@ -390,13 +410,23 @@ You do not need to report an error; continue performing your task based on exist
 EOF
 )
         for tgt_dir in "$GLOBAL_DIR/skills" "$SCRIPT_DIR/../skills"; do
-            if [ -d "$tgt_dir" ]; then
-                rm -rf "$tgt_dir/$skill_name"
-                mkdir -p "$tgt_dir/$skill_name"
-                echo "$stub_content" > "$tgt_dir/$skill_name/SKILL.md"
+            [ -d "$tgt_dir" ] || continue
+            skill_path="$tgt_dir/$skill_name"
+            # Skip targets we cannot modify (e.g. root-owned files from a past
+            # sudo run). Removing/overwriting them would need sudo; instead we
+            # warn and move on so the setup stays idempotent and non-blocking.
+            if [ -e "$skill_path" ] && [ ! -w "$tgt_dir" ]; then
+                echo "   ⚠️  Skipped (not writable, needs different ownership): $skill_path"
+                continue
             fi
+            if ! rm -rf "$skill_path" 2>/dev/null; then
+                echo "   ⚠️  Skipped (cannot remove, needs different ownership): $skill_path"
+                continue
+            fi
+            mkdir -p "$skill_path"
+            echo "$stub_content" > "$skill_path/SKILL.md"
+            echo "   ✓ Stubbed: $skill_name (in $tgt_dir)"
         done
-        echo "   ✓ Stubbed: $skill_name"
     done < "$SCRIPT_DIR/ignore-skills.txt"
 fi
 
